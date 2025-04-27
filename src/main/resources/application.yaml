@@ -1,0 +1,27 @@
+server:
+  port: 8080
+  websocket:
+    path: /ws
+
+redis:
+  host: localhost
+  port: 6379
+  password: 
+  database: 0
+  timeout: 2000
+  pool:
+    max-active: 8
+    max-idle: 8
+    min-idle: 0
+    max-wait: -1
+
+chat:
+  heartbeat:
+    reader-idle-time: 60
+    writer-idle-time: 0
+    all-idle-time: 0
+  thread-pool:
+    core-size: 4
+    max-size: 8
+    queue-capacity: 1000
+    keep-alive-seconds: 60

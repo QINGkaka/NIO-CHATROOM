@@ -13,14 +13,14 @@ public class RedisMessageDao implements MessageDao {
     private static final String MESSAGE_INDEX_PREFIX = "messages:index:";
 
     @Override
-    public void save(ChatMessage message) {
+    public void save(ChatMessage ProtocolMessage) {
         try (Jedis jedis = RedisUtil.getJedis()) {
-            String json = JsonUtil.toJson(message);
-            String roomKey = MESSAGE_KEY_PREFIX + message.getRoomId();
-            String messageKey = MESSAGE_INDEX_PREFIX + message.getMessageId();
+            String json = JsonUtil.toJson(ProtocolMessage);
+            String roomKey = MESSAGE_KEY_PREFIX + ProtocolMessage.getRoomId();
+            String messageKey = MESSAGE_INDEX_PREFIX + ProtocolMessage.getMessageId();
             
             // 保存消息到时间线
-            jedis.zadd(roomKey, message.getTimestamp(), message.getMessageId());
+            jedis.zadd(roomKey, ProtocolMessage.getTimestamp(), ProtocolMessage.getMessageId());
             // 保存消息内容
             jedis.set(messageKey, json);
             // 设置消息过期时间（可选，例如30天）
@@ -77,7 +77,7 @@ public class RedisMessageDao implements MessageDao {
                 .map(messageId -> jedis.get(MESSAGE_INDEX_PREFIX + messageId))
                 .filter(json -> json != null)
                 .map(json -> JsonUtil.fromJson(json, ChatMessage.class))
-                .filter(message -> message.getContent().contains(keyword))
+                .filter(ProtocolMessage -> ProtocolMessage.getContent().contains(keyword))
                 .limit(limit)
                 .collect(Collectors.toList());
         }
@@ -90,8 +90,8 @@ public class RedisMessageDao implements MessageDao {
             String messageKey = MESSAGE_INDEX_PREFIX + messageId;
             String json = jedis.get(messageKey);
             if (json != null) {
-                ChatMessage message = JsonUtil.fromJson(json, ChatMessage.class);
-                String roomKey = MESSAGE_KEY_PREFIX + message.getRoomId();
+                ChatMessage ProtocolMessage = JsonUtil.fromJson(json, ChatMessage.class);
+                String roomKey = MESSAGE_KEY_PREFIX + ProtocolMessage.getRoomId();
                 
                 // 从时间线中删除
                 jedis.zrem(roomKey, messageId);
@@ -102,21 +102,21 @@ public class RedisMessageDao implements MessageDao {
     }
 
     @Override
-    public void updateMessage(ChatMessage message) {
+    public void updateMessage(ChatMessage ProtocolMessage) {
         try (Jedis jedis = RedisUtil.getJedis()) {
-            String messageKey = MESSAGE_INDEX_PREFIX + message.getMessageId();
+            String messageKey = MESSAGE_INDEX_PREFIX + ProtocolMessage.getMessageId();
             // 检查消息是否存在
             if (!jedis.exists(messageKey)) {
-                throw new IllegalArgumentException("Message not found: " + message.getMessageId());
+                throw new IllegalArgumentException("ProtocolMessage not found: " + ProtocolMessage.getMessageId());
             }
             
             // 更新消息内容
-            String json = JsonUtil.toJson(message);
+            String json = JsonUtil.toJson(ProtocolMessage);
             jedis.set(messageKey, json);
             
             // 更新时间线中的时间戳（如果需要）
-            String roomKey = MESSAGE_KEY_PREFIX + message.getRoomId();
-            jedis.zadd(roomKey, message.getTimestamp(), message.getMessageId());
+            String roomKey = MESSAGE_KEY_PREFIX + ProtocolMessage.getRoomId();
+            jedis.zadd(roomKey, ProtocolMessage.getTimestamp(), ProtocolMessage.getMessageId());
         }
     }
 }

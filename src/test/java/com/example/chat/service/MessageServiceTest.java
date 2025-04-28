@@ -28,13 +28,13 @@ public class MessageServiceTest {
     
     @Test
     public void testSendMessage() {
-        ChatMessage message = ChatMessage.builder()
+        ChatMessage ProtocolMessage = ChatMessage.builder()
             .messageId("test-id")
-            .content("test message")
+            .content("test ProtocolMessage")
             .build();
             
-        messageService.sendMessage(message);
-        verify(messageDao).save(message);
+        messageService.sendMessage(ProtocolMessage);
+        verify(messageDao).save(ProtocolMessage);
     }
 }
 

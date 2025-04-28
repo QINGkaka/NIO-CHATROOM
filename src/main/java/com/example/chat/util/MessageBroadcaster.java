@@ -1,6 +1,6 @@
 package com.example.chat.util;
 
-import com.example.chat.protocol.Message;
+import com.example.chat.protocol.ProtocolMessage;
 import io.netty.channel.Channel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
@@ -42,16 +42,16 @@ public class MessageBroadcaster {
         }
     }
 
-    public static void broadcastToRoom(String roomId, Message message) {
+    public static void broadcastToRoom(String roomId, ProtocolMessage ProtocolMessage) {
         ChannelGroup group = ROOM_GROUPS.get(roomId);
         if (group != null) {
-            group.writeAndFlush(message);
-            log.debug("Broadcasted message to room {}: {}", roomId, message);
+            group.writeAndFlush(ProtocolMessage);
+            log.debug("Broadcasted ProtocolMessage to room {}: {}", roomId, ProtocolMessage);
         }
     }
 
-    public static void broadcastToAll(Message message) {
-        GLOBAL_GROUP.writeAndFlush(message);
-        log.debug("Broadcasted message to all users: {}", message);
+    public static void broadcastToAll(ProtocolMessage ProtocolMessage) {
+        GLOBAL_GROUP.writeAndFlush(ProtocolMessage);
+        log.debug("Broadcasted ProtocolMessage to all users: {}", ProtocolMessage);
     }
 }

@@ -9,7 +9,7 @@ import lombok.AllArgsConstructor;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public abstract class Message {
+public abstract class ProtocolMessage {
     private MessageType type;
     private String requestId;
     private String sender;

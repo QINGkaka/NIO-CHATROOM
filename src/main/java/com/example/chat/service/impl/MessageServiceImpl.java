@@ -23,14 +23,14 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public void sendMessage(ChatMessage message) {
-        if (message.getMessageId() == null) {
-            message.setMessageId(UUID.randomUUID().toString());
+    public void sendMessage(ChatMessage ProtocolMessage) {
+        if (ProtocolMessage.getMessageId() == null) {
+            ProtocolMessage.setMessageId(UUID.randomUUID().toString());
         }
-        if (message.getTimestamp() == 0) {
-            message.setTimestamp(System.currentTimeMillis());
+        if (ProtocolMessage.getTimestamp() == 0) {
+            ProtocolMessage.setTimestamp(System.currentTimeMillis());
         }
-        messageDao.save(message);
+        messageDao.save(ProtocolMessage);
     }
 
     @Override
@@ -44,12 +44,12 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public void broadcastMessage(ChatMessage message) {
-        String messageJson = JsonUtil.toJson(message);
+    public void broadcastMessage(ChatMessage ProtocolMessage) {
+        String messageJson = JsonUtil.toJson(ProtocolMessage);
         TextWebSocketFrame frame = new TextWebSocketFrame(messageJson);
         
-        if (message.getRoomId() != null) {
-            ChatRoom room = roomDao.findById(message.getRoomId());
+        if (ProtocolMessage.getRoomId() != null) {
+            ChatRoom room = roomDao.findById(ProtocolMessage.getRoomId());
             if (room != null && room.getMembers() != null) {
                 for (String userId : room.getMembers()) {
                     Channel channel = ChannelUtil.getChannel(userId);
@@ -78,11 +78,11 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-    public void updateMessage(ChatMessage message) {
-        if (message.getMessageId() == null) {
-            throw new IllegalArgumentException("Message ID cannot be null for update");
+    public void updateMessage(ChatMessage ProtocolMessage) {
+        if (ProtocolMessage.getMessageId() == null) {
+            throw new IllegalArgumentException("ProtocolMessage ID cannot be null for update");
         }
-        messageDao.updateMessage(message);
+        messageDao.updateMessage(ProtocolMessage);
     }
 }
 

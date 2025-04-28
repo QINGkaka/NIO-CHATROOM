@@ -18,8 +18,8 @@ public class RoomServiceImpl implements RoomService {
     public ChatRoom createRoom(String roomName, String creatorId) {
         ChatRoom room = ChatRoom.builder()
             .roomId(UUID.randomUUID().toString())
-            .roomName(roomName)
-            .creatorId(creatorId)
+            .name(roomName)
+            .creator(creatorId)
             .createTime(System.currentTimeMillis())
             .build();
         

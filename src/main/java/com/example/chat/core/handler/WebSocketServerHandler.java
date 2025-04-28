@@ -3,7 +3,7 @@ package com.example.chat.core.handler;
 import com.example.chat.model.ChatMessage;
 import com.example.chat.model.ChatRoom;
 import com.example.chat.model.User;
-import com.example.chat.protocol.Message;
+import com.example.chat.protocol.ProtocolMessage;
 import com.example.chat.protocol.MessageType;
 import com.example.chat.protocol.request.ChatRequest;
 import com.example.chat.protocol.request.LoginRequest;
@@ -23,7 +23,7 @@ import java.util.UUID;
 
 
 @Slf4j
-public class WebSocketServerHandler extends SimpleChannelInboundHandler<Message> {
+public class WebSocketServerHandler extends SimpleChannelInboundHandler<ProtocolMessage> {
     private final UserService userService;
     private final RoomService roomService;
     private final MessageService messageService;
@@ -35,7 +35,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Message>
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Message msg) {
+    protected void channelRead0(ChannelHandlerContext ctx, ProtocolMessage msg) {
         MessageType type = msg.getType();
         switch (type) {
             case LOGIN_REQUEST:
@@ -48,7 +48,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Message>
                 handleRoomRequest(ctx, (RoomRequest) msg);
                 break;
             default:
-                log.warn("Unknown message type: {}", type);
+                log.warn("Unknown ProtocolMessage type: {}", type);
         }
     }
 
@@ -122,7 +122,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Message>
             }
 
             User user = userService.getUserById(userId);
-            ChatMessage message = ChatMessage.builder()
+            ChatMessage ProtocolMessage = ChatMessage.builder()
                 .messageId(UUID.randomUUID().toString())
                 .roomId(request.getRoomId())
                 .userId(userId)
@@ -132,11 +132,11 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Message>
                 .type(ChatMessage.MessageType.TEXT)
                 .build();
 
-            messageService.sendMessage(message);
-            messageService.broadcastMessage(message);
+            messageService.sendMessage(ProtocolMessage);
+            messageService.broadcastMessage(ProtocolMessage);
 
             response.setSuccess(true);
-            response.setMessage(message);
+            response.setProtocolMessage(ProtocolMessage);
         } catch (Exception e) {
             log.error("Chat error", e);
             response.setSuccess(false);

@@ -1,7 +1,7 @@
 package com.example.chat.protocol.response;
 
 import com.example.chat.model.ChatMessage;
-import com.example.chat.protocol.Message;
+import com.example.chat.protocol.ProtocolMessage;
 import com.example.chat.protocol.MessageType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -10,7 +10,7 @@ import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class MessageHistoryResponse extends Message {
+public class MessageHistoryResponse extends ProtocolMessage {
     private boolean success;
     private String error;
     private List<ChatMessage> messages;

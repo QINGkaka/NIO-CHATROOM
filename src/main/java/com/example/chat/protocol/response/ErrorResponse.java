@@ -1,6 +1,6 @@
 package com.example.chat.protocol.response;
 
-import com.example.chat.protocol.Message;
+import com.example.chat.protocol.ProtocolMessage;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.SuperBuilder;
@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @SuperBuilder
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-public class ErrorResponse extends Message {
+public class ErrorResponse extends ProtocolMessage {
     private int code;
     private String error;
     private String details;

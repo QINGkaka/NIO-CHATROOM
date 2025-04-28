@@ -1,13 +1,13 @@
 package com.example.chat.protocol.response;
 
-import com.example.chat.protocol.Message;
+import com.example.chat.protocol.ProtocolMessage;
 import com.example.chat.protocol.MessageType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class HeartbeatResponse extends Message {
+public class HeartbeatResponse extends ProtocolMessage {
     private long timestamp;
     
     public HeartbeatResponse() {

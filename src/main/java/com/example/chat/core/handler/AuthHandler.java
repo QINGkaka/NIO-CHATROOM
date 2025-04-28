@@ -1,6 +1,6 @@
 package com.example.chat.core.handler;
 
-import com.example.chat.protocol.Message;
+import com.example.chat.protocol.ProtocolMessage;
 import com.example.chat.protocol.MessageType;
 import com.example.chat.protocol.response.ErrorResponse;
 import com.example.chat.protocol.response.LoginResponse;
@@ -13,7 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 //业务处理器示例（用户认证）
 @Slf4j
 @ChannelHandler.Sharable
-public class AuthHandler extends SimpleChannelInboundHandler<Message> {
+public class AuthHandler extends SimpleChannelInboundHandler<ProtocolMessage> {
     private final UserService userService;
     
     public AuthHandler(UserService userService) {
@@ -21,7 +21,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Message> {
     }
     
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, Message msg) {
+    protected void channelRead0(ChannelHandlerContext ctx, ProtocolMessage msg) {
         if (msg.getType() != MessageType.LOGIN) {
             if (isAuthenticated(ctx)) {
                 ctx.fireChannelRead(msg); // 非登录消息透传
@@ -42,7 +42,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<Message> {
                 ctx.channel().attr(AttributeKey.valueOf("userId")).set(msg.getSender());
                 LoginResponse loginResponse = LoginResponse.builder()
                     .success(true)
-                    .message("Login successful")
+                    .ProtocolMessage("Login successful")
                     .build();
                 ctx.writeAndFlush(loginResponse);
             } else {

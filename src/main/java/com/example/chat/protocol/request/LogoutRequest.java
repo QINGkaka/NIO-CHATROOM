@@ -4,15 +4,11 @@ import com.example.chat.protocol.ProtocolMessage;
 import com.example.chat.protocol.MessageType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.experimental.SuperBuilder;
-import lombok.NoArgsConstructor;
 
 @Data
-@SuperBuilder
-@NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-public class HeartbeatRequest extends ProtocolMessage {
-    {
-        setType(MessageType.HEARTBEAT_REQUEST);
+public class LogoutRequest extends ProtocolMessage {
+    public LogoutRequest() {
+        setType(MessageType.LOGOUT_REQUEST);
     }
 }

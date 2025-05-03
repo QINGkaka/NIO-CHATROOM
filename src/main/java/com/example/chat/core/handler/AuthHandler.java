@@ -22,7 +22,7 @@ public class AuthHandler extends SimpleChannelInboundHandler<ProtocolMessage> {
     
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, ProtocolMessage msg) {
-        if (msg.getType() != MessageType.LOGIN) {
+        if (msg.getType() != MessageType.LOGIN_REQUEST) {
             if (isAuthenticated(ctx)) {
                 ctx.fireChannelRead(msg); // 非登录消息透传
             } else {
@@ -63,4 +63,5 @@ public class AuthHandler extends SimpleChannelInboundHandler<ProtocolMessage> {
         return ctx.channel().hasAttr(AttributeKey.valueOf("userId"));
     }
 }
+
 

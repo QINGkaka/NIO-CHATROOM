@@ -4,13 +4,15 @@ import com.example.chat.model.ChatMessage;
 import com.example.chat.model.ChatRoom;
 import com.example.chat.model.User;
 import com.example.chat.protocol.ProtocolMessage;
-import com.example.chat.protocol.MessageType;
+import com.example.chat.protocol.StatusCode;
 import com.example.chat.protocol.request.ChatRequest;
 import com.example.chat.protocol.request.LoginRequest;
 import com.example.chat.protocol.request.RoomRequest;
 import com.example.chat.protocol.response.ChatResponse;
 import com.example.chat.protocol.response.LoginResponse;
 import com.example.chat.protocol.response.RoomResponse;
+import com.example.chat.protocol.response.ErrorResponse;
+import com.example.chat.protocol.MessageValidator;
 import com.example.chat.service.MessageService;
 import com.example.chat.service.RoomService;
 import com.example.chat.service.UserService;
@@ -36,19 +38,48 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Protocol
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, ProtocolMessage msg) {
-        MessageType type = msg.getType();
-        switch (type) {
-            case LOGIN_REQUEST:
-                handleLoginRequest(ctx, (LoginRequest) msg);
-                break;
-            case CHAT_REQUEST:
-                handleChatRequest(ctx, (ChatRequest) msg);
-                break;
-            case ROOM_REQUEST:
-                handleRoomRequest(ctx, (RoomRequest) msg);
-                break;
-            default:
-                log.warn("Unknown ProtocolMessage type: {}", type);
+        try {
+            // 添加消息验证
+            MessageValidator.validate(msg);
+            
+            // 根据消息类型处理
+            switch (msg.getType()) {
+                case LOGIN_REQUEST:
+                    handleLoginRequest(ctx, (LoginRequest) msg);
+                    break;
+                case CHAT_REQUEST:
+                    handleChatRequest(ctx, (ChatRequest) msg);
+                    break;
+                case ROOM_CREATE:
+                case ROOM_JOIN:
+                case ROOM_LEAVE:
+                case ROOM_LIST:
+                    handleRoomRequest(ctx, (RoomRequest) msg);
+                    break;
+                default:
+                    log.warn("Unsupported message type: {}", msg.getType());
+                    ErrorResponse errorResponse = new ErrorResponse(
+                        StatusCode.BAD_REQUEST,
+                        "Unsupported message type"
+                    );
+                    ctx.writeAndFlush(errorResponse);
+            }
+        } catch (IllegalArgumentException e) {
+            // 处理验证失败的情况
+            log.error("Message validation failed: {}", e.getMessage());
+            ErrorResponse errorResponse = new ErrorResponse(
+                StatusCode.BAD_REQUEST,
+                e.getMessage()
+            );
+            ctx.writeAndFlush(errorResponse);
+        } catch (Exception e) {
+            // 处理其他异常
+            log.error("Error processing message", e);
+            ErrorResponse errorResponse = new ErrorResponse(
+                StatusCode.INTERNAL_ERROR,
+                "Internal server error"
+            );
+            ctx.writeAndFlush(errorResponse);
         }
     }
 
@@ -122,7 +153,7 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Protocol
             }
 
             User user = userService.getUserById(userId);
-            ChatMessage ProtocolMessage = ChatMessage.builder()
+            ChatMessage message = ChatMessage.builder()
                 .messageId(UUID.randomUUID().toString())
                 .roomId(request.getRoomId())
                 .userId(userId)
@@ -132,15 +163,19 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Protocol
                 .type(ChatMessage.MessageType.TEXT)
                 .build();
 
-            messageService.sendMessage(ProtocolMessage);
-            messageService.broadcastMessage(ProtocolMessage);
+            messageService.sendMessage(message);
+            messageService.broadcastMessage(message);
 
             response.setSuccess(true);
-            response.setProtocolMessage(ProtocolMessage);
+            response.setMessage(message);  // 从 setProtocolMessage 改为 setMessage
         } catch (Exception e) {
             log.error("Chat error", e);
-            response.setSuccess(false);
-            response.setError("Internal server error");
+            ErrorResponse errorResponse = new ErrorResponse(
+                StatusCode.INTERNAL_ERROR,
+                "Failed to process chat message"
+            );
+            ctx.writeAndFlush(errorResponse);
+            return;
         }
 
         ctx.writeAndFlush(response);
@@ -182,14 +217,26 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Protocol
                     response.setError("Unknown action: " + request.getAction());
             }
         } catch (Exception e) {
-            log.error("Room error", e);
-            response.setSuccess(false);
-            response.setError("Internal server error");
+            log.error("Room operation error", e);
+            ErrorResponse errorResponse = new ErrorResponse(
+                StatusCode.ROOM_NOT_EXIST,
+                "Room operation failed"
+            );
+            ctx.writeAndFlush(errorResponse);
+            return;
         }
 
         ctx.writeAndFlush(response);
     }
 }
+
+
+
+
+
+
+
+
 
 
 

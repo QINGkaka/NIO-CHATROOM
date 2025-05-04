@@ -1,74 +1,120 @@
 package com.example.chat.service.impl;
 
-import com.example.chat.dao.RoomDao;
-import com.example.chat.model.ChatRoom;
+import com.example.chat.model.Room;
 import com.example.chat.service.RoomService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
+@Slf4j
+@Service
 public class RoomServiceImpl implements RoomService {
-    private final RoomDao roomDao;
-
-    public RoomServiceImpl(RoomDao roomDao) {
-        this.roomDao = roomDao;
-    }
-
+    
+    // 房间ID -> 房间对象
+    private final Map<String, Room> rooms = new ConcurrentHashMap<>();
+    
+    // 房间ID -> 用户ID集合
+    private final Map<String, Set<String>> roomUsers = new ConcurrentHashMap<>();
+    
     @Override
-    public ChatRoom createRoom(String roomName, String creatorId) {
-        ChatRoom room = ChatRoom.builder()
-            .roomId(UUID.randomUUID().toString())
-            .name(roomName)
-            .creator(creatorId)
-            .createTime(System.currentTimeMillis())
-            .build();
+    public Room createRoom(String name, String creatorId) {
+        String roomId = UUID.randomUUID().toString();
+        Room room = Room.builder()
+                .id(roomId)
+                .name(name)
+                .creatorId(creatorId)
+                .createTime(System.currentTimeMillis())
+                .build();
         
-        room.addMember(creatorId);
-        roomDao.save(room);
+        rooms.put(roomId, room);
+        roomUsers.put(roomId, ConcurrentHashMap.newKeySet());
+        
+        // 创建者自动加入房间
+        addUserToRoom(roomId, creatorId);
+        
+        log.info("Room created: {}, creator: {}", roomId, creatorId);
         return room;
     }
-
+    
+    @Override
+    public Room getRoom(String roomId) {
+        return rooms.get(roomId);
+    }
+    
+    @Override
+    public List<Room> getAllRooms() {
+        return new ArrayList<>(rooms.values());
+    }
+    
+    @Override
+    public void addUserToRoom(String roomId, String userId) {
+        Set<String> users = roomUsers.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet());
+        users.add(userId);
+        log.info("User {} joined room {}", userId, roomId);
+    }
+    
+    @Override
+    public void removeUserFromRoom(String roomId, String userId) {
+        Set<String> users = roomUsers.get(roomId);
+        if (users != null) {
+            users.remove(userId);
+            log.info("User {} left room {}", userId, roomId);
+        }
+    }
+    
+    @Override
+    public Set<String> getUsersInRoom(String roomId) {
+        return roomUsers.getOrDefault(roomId, Collections.emptySet());
+    }
+    
+    @Override
+    public boolean isUserInRoom(String roomId, String userId) {
+        Set<String> users = roomUsers.get(roomId);
+        return users != null && users.contains(userId);
+    }
+    
     @Override
     public void deleteRoom(String roomId) {
-        roomDao.delete(roomId);
+        rooms.remove(roomId);
+        roomUsers.remove(roomId);
+        log.info("Room deleted: {}", roomId);
     }
-
+    
     @Override
-    public ChatRoom getRoom(String roomId) {
-        return roomDao.findById(roomId);
-    }
-
-    @Override
-    public List<ChatRoom> getAllRooms() {
-        return roomDao.findAll();
-    }
-
-    @Override
-    public List<ChatRoom> getUserRooms(String userId) {
-        return roomDao.findByMember(userId);
-    }
-
-    @Override
-    public void joinRoom(String roomId, String userId) {
-        ChatRoom room = getRoom(roomId);
-        if (room != null) {
-            room.addMember(userId);
-            roomDao.update(room);
+    public List<String> getRoomMembers(String roomId) {
+        Set<String> users = roomUsers.get(roomId);
+        if (users != null) {
+            return new ArrayList<>(users);
         }
+        return Collections.emptyList();
     }
-
+    
     @Override
-    public void leaveRoom(String roomId, String userId) {
-        ChatRoom room = getRoom(roomId);
-        if (room != null) {
-            room.removeMember(userId);
-            roomDao.update(room);
-        }
+    public List<Room> getRoomsByUserId(String userId) {
+        return rooms.values().stream()
+                .filter(room -> isUserInRoom(room.getId(), userId))
+                .collect(Collectors.toList());
     }
-
+    
     @Override
-    public boolean isRoomMember(String roomId, String userId) {
-        ChatRoom room = getRoom(roomId);
-        return room != null && room.getMembers() != null && room.getMembers().contains(userId);
+    public Room getRoomById(String roomId) {
+        return rooms.get(roomId);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

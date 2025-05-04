@@ -1,12 +1,11 @@
 package com.example.chat.protocol.response;
 
-import com.example.chat.model.ChatMessage;
-import com.example.chat.protocol.ProtocolMessage;
 import com.example.chat.protocol.MessageType;
+import com.example.chat.protocol.ProtocolMessage;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.experimental.SuperBuilder;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
@@ -14,10 +13,11 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode(callSuper = true)
 public class ChatResponse extends ProtocolMessage {
     private boolean success;
-    private ChatMessage message;  // 修正字段名
-    private String error;
+    private String message;
     
-    {
-        setType(MessageType.CHAT_RESPONSE);
+    public ChatResponse(boolean success, String message) {
+        super(MessageType.CHAT_RESPONSE);
+        this.success = success;
+        this.message = message;
     }
 }

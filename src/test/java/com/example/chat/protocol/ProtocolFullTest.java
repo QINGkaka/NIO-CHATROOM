@@ -81,17 +81,21 @@ public class ProtocolFullTest {
     @Test
     public void testChatMessage() throws InterruptedException {
         ChatRequest request = ChatRequest.builder()
-            .content("Hello World")
-            .sender("TestUser")
-            .roomId("TestRoom")
+            .type(MessageType.CHAT_REQUEST)
+            .sender("user1")
+            .content("Hello, world!")
+            .roomId("room1")
             .build();
 
         clientChannel.writeAndFlush(request);
 
         assertTrue(messageLatch.await(5, TimeUnit.SECONDS));
         assertNotNull(receivedMessage);
-        assertTrue(receivedMessage instanceof ChatRequest);
-        assertEquals("Hello World", ((ChatRequest) receivedMessage).getContent());
+        assertTrue(receivedMessage.getType() == MessageType.CHAT_REQUEST);
+        if (receivedMessage.getType() == MessageType.CHAT_REQUEST) {
+            ChatRequest chatRequest = (ChatRequest) receivedMessage;
+            assertEquals("Hello, world!", chatRequest.getContent());
+        }
     }
 
     @Test
@@ -103,7 +107,7 @@ public class ProtocolFullTest {
 
         assertTrue(messageLatch.await(5, TimeUnit.SECONDS));
         assertNotNull(receivedMessage);
-        assertTrue(receivedMessage instanceof HeartbeatRequest);
+        assertTrue(receivedMessage.getType() == MessageType.HEARTBEAT_REQUEST);
     }
 
     @Test
@@ -118,8 +122,13 @@ public class ProtocolFullTest {
 
         assertTrue(messageLatch.await(5, TimeUnit.SECONDS));
         assertNotNull(receivedMessage);
-        assertTrue(receivedMessage instanceof RoomRequest);
-        assertEquals("NewRoom", ((RoomRequest) receivedMessage).getRoomId());
+        assertTrue(receivedMessage.getType() == MessageType.ROOM_REQUEST);
+        if (receivedMessage.getType() == MessageType.ROOM_REQUEST) {
+            RoomRequest roomRequest = (RoomRequest) receivedMessage;
+            assertEquals("NewRoom", roomRequest.getRoomId());
+            assertEquals(MessageType.ROOM_REQUEST, roomRequest.getType());
+            assertTrue(roomRequest.getType() == MessageType.ROOM_REQUEST);
+        }
     }
 
     @AfterEach
@@ -135,3 +144,10 @@ public class ProtocolFullTest {
         workerGroup.shutdownGracefully();
     }
 }
+
+
+
+
+
+
+

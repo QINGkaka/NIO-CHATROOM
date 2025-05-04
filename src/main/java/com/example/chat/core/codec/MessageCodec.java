@@ -51,45 +51,90 @@ public class MessageCodec extends MessageToMessageCodec<ByteBuf, ProtocolMessage
     }
     
     @Override
-    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
-        // 1. 验证魔数
-        int magic = in.readInt();
-        if (magic != MAGIC_NUMBER) {
-            throw new DecoderException("Invalid magic number: " + magic);
+    protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
+        // 保存读取索引，以便需要时重置
+        in.markReaderIndex();
+        
+        // 确保有足够的字节可读
+        if (in.readableBytes() < 4) {
+            return;
         }
         
-        // 2. 验证版本
+        // 1. 魔数 4字节
+        int magicNum = in.readInt();
+        if (magicNum != MAGIC_NUMBER) {
+            in.resetReaderIndex();
+            throw new DecoderException("Invalid magic number: " + magicNum);
+        }
+        
+        // 确保有足够的字节可读
+        if (in.readableBytes() < 1 + 1 + 1 + 2 + 4 + 4) {
+            in.resetReaderIndex();
+            return;
+        }
+        
+        // 2. 版本号 1字节
         byte version = in.readByte();
         if (version != VERSION) {
-            throw new DecoderException("Unsupported version: " + version);
+            in.resetReaderIndex();
+            throw new DecoderException("Version not supported: " + version);
         }
         
-        // 3. 读取消息类型
-        byte typeCode = in.readByte();
-        MessageType type = MessageType.fromCode(typeCode);
+        // 3. 序列化方式 1字节 (暂时只支持JSON)
+        in.readByte(); // 跳过序列化类型
         
-        // 4. 读取状态码
+        // 4. 消息类型 1字节
+        byte messageTypeCode = in.readByte();
+        MessageType messageType = MessageType.fromCode(messageTypeCode);
+        if (messageType == null) {
+            in.resetReaderIndex();
+            throw new DecoderException("Unknown message type: " + messageTypeCode);
+        }
+        
+        // 5. 状态码 2字节 (在反序列化时设置)
         short statusCode = in.readShort();
         
-        // 5. 读取消息序号
-        int requestId = in.readInt();
+        // 6. 请求ID 4字节 (在反序列化时设置)
+        int requestIdHash = in.readInt();
+        String requestId = String.valueOf(requestIdHash);
+        ProtocolMessage message = new ProtocolMessage();
+        message.setRequestId(requestId);  // 使用 requestId
         
-        // 6. 读取消息长度
+        // 7. 正文长度 4字节
         int length = in.readInt();
+        if (in.readableBytes() < length) {
+            // 数据不完整，重置读指针
+            in.resetReaderIndex();
+            return;
+        }
         
-        // 7. 读取消息体
-        byte[] content = new byte[length];
-        in.readBytes(content);
+        // 8. 消息正文
+        byte[] bytes = new byte[length];
+        in.readBytes(bytes);
         
-        // 8. 反序列化
-        String json = new String(content, StandardCharsets.UTF_8);
-        ProtocolMessage msg = JsonUtil.fromJson(json, type.getMessageClass());
-        msg.setType(type);
-        msg.setStatusCode(statusCode);
-        msg.setRequestId(String.valueOf(requestId));
+        // 反序列化为基本的ProtocolMessage
+        String json = new String(bytes, StandardCharsets.UTF_8);
+        ProtocolMessage decodedMessage = JsonUtil.fromJson(json, ProtocolMessage.class);
         
-        out.add(msg);
+        // 设置从头部读取的值
+        decodedMessage.setType(messageType);
+        decodedMessage.setStatusCode(statusCode);
+        
+        out.add(decodedMessage);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

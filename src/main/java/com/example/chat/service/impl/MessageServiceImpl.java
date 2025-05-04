@@ -1,88 +1,68 @@
 package com.example.chat.service.impl;
 
-import com.example.chat.dao.MessageDao;
-import com.example.chat.dao.RoomDao;
 import com.example.chat.model.ChatMessage;
-import com.example.chat.model.ChatRoom;
 import com.example.chat.service.MessageService;
-import com.example.chat.util.ChannelUtil;
-import io.netty.channel.Channel;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
-import com.example.chat.util.JsonUtil;
+import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
+@Service
 public class MessageServiceImpl implements MessageService {
-    private final MessageDao messageDao;
-    private final RoomDao roomDao;
-
-    public MessageServiceImpl(MessageDao messageDao, RoomDao roomDao) {
-        this.messageDao = messageDao;
-        this.roomDao = roomDao;
-    }
-
+    
+    // 模拟消息存储
+    private final List<ChatMessage> messages = new CopyOnWriteArrayList<>();
+    
     @Override
-    public void sendMessage(ChatMessage ProtocolMessage) {
-        if (ProtocolMessage.getMessageId() == null) {
-            ProtocolMessage.setMessageId(UUID.randomUUID().toString());
+    public void saveMessage(ChatMessage message) {
+        if (message != null) {
+            messages.add(message);
         }
-        if (ProtocolMessage.getTimestamp() == 0) {
-            ProtocolMessage.setTimestamp(System.currentTimeMillis());
+    }
+    
+    @Override
+    public List<ChatMessage> getUserMessages(String userId, String otherUserId, int limit) {
+        if (userId == null || otherUserId == null) {
+            return new ArrayList<>();
         }
-        messageDao.save(ProtocolMessage);
-    }
-
-    @Override
-    public List<ChatMessage> getRoomMessages(String roomId, int limit, long beforeTime) {
-        return messageDao.findByRoomId(roomId, limit, beforeTime);
-    }
-
-    @Override
-    public void deleteRoomMessages(String roomId) {
-        messageDao.deleteByRoomId(roomId);
-    }
-
-    @Override
-    public void broadcastMessage(ChatMessage ProtocolMessage) {
-        String messageJson = JsonUtil.toJson(ProtocolMessage);
-        TextWebSocketFrame frame = new TextWebSocketFrame(messageJson);
         
-        if (ProtocolMessage.getRoomId() != null) {
-            ChatRoom room = roomDao.findById(ProtocolMessage.getRoomId());
-            if (room != null && room.getMembers() != null) {
-                for (String userId : room.getMembers()) {
-                    Channel channel = ChannelUtil.getChannel(userId);
-                    if (channel != null && channel.isActive()) {
-                        channel.writeAndFlush(frame.retain());
-                    }
-                }
-            }
+        return messages.stream()
+                .filter(msg -> (msg.getSenderId().equals(userId) && msg.getReceiverId().equals(otherUserId)) || 
+                               (msg.getSenderId().equals(otherUserId) && msg.getReceiverId().equals(userId)))
+                .sorted(Comparator.comparingLong(ChatMessage::getTimestamp).reversed())
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    public List<ChatMessage> getRoomMessages(String roomId, int limit) {
+        if (roomId == null) {
+            return new ArrayList<>();
         }
-        frame.release();
+        
+        return messages.stream()
+                .filter(msg -> roomId.equals(msg.getRoomId()))
+                .sorted(Comparator.comparingLong(ChatMessage::getTimestamp).reversed())
+                .limit(limit)
+                .collect(Collectors.toList());
     }
-
+    
     @Override
-    public long getMessageCount(String roomId) {
-        return messageDao.getMessageCount(roomId);
+    public List<ChatMessage> getMessagesBetweenUsers(String userId1, String userId2) {
+        return getUserMessages(userId1, userId2, 100); // 默认获取最近100条消息
     }
-
+    
     @Override
-    public List<ChatMessage> searchMessages(String roomId, String keyword, int limit) {
-        return messageDao.searchMessages(roomId, keyword, limit);
-    }
-
-    @Override
-    public void deleteMessage(String messageId) {
-        messageDao.deleteMessage(messageId);
-    }
-
-    @Override
-    public void updateMessage(ChatMessage ProtocolMessage) {
-        if (ProtocolMessage.getMessageId() == null) {
-            throw new IllegalArgumentException("ProtocolMessage ID cannot be null for update");
-        }
-        messageDao.updateMessage(ProtocolMessage);
+    public void sendMessage(ChatMessage message) {
+        // 保存消息
+        saveMessage(message);
+        
+        // 这里可以添加发送消息的逻辑，例如通过WebSocket发送
+        // 在实际实现中，这个方法可能会调用其他服务或组件来发送消息
     }
 }
+
 

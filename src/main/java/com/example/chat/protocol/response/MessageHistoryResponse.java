@@ -1,8 +1,9 @@
 package com.example.chat.protocol.response;
 
 import com.example.chat.model.ChatMessage;
-import com.example.chat.protocol.ProtocolMessage;
+import com.example.chat.protocol.AbstractProtocolMessage;
 import com.example.chat.protocol.MessageType;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -10,13 +11,24 @@ import java.util.List;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class MessageHistoryResponse extends ProtocolMessage {
-    private boolean success;
-    private String error;
+public class MessageHistoryResponse extends AbstractProtocolMessage {
     private List<ChatMessage> messages;
-    private boolean hasMore;    // 是否还有更多历史消息
+    private boolean hasMore;
     
     public MessageHistoryResponse() {
-        setType(MessageType.MESSAGE_HISTORY_RESPONSE);
+        super(MessageType.MESSAGE_HISTORY_RESPONSE);
+    }
+    
+    @Builder
+    public MessageHistoryResponse(List<ChatMessage> messages, boolean hasMore, String requestId) {
+        super(MessageType.MESSAGE_HISTORY_RESPONSE);
+        this.messages = messages;
+        this.hasMore = hasMore;
+        this.setRequestId(requestId);
     }
 }
+
+
+
+
+

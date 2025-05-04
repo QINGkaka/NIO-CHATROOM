@@ -1,26 +1,39 @@
 package com.example.chat.util;
 
-import com.example.chat.model.ChatMessage;
-import java.util.UUID;
+import com.example.chat.protocol.MessageType;
+import com.example.chat.protocol.response.SystemMessage;
 
+/**
+ * 系统消息工具类
+ */
 public class SystemMessageUtil {
-    public static ChatMessage createSystemMessage(String roomId, String content) {
-        return ChatMessage.builder()
-            .messageId(UUID.randomUUID().toString())
-            .roomId(roomId)
-            .userId("SYSTEM")
-            .username("System")
-            .content(content)
-            .timestamp(System.currentTimeMillis())
-            .type(ChatMessage.MessageType.SYSTEM)
-            .build();
+    
+    /**
+     * 创建系统消息
+     */
+    public static SystemMessage createSystemMessage(String title, String content, String level) {
+        SystemMessage message = new SystemMessage();
+        message.setTitle(title);
+        message.setContent(content);
+        message.setLevel(level);
+        message.setTimestamp(System.currentTimeMillis());
+        return message;
     }
-
-    public static ChatMessage createUserJoinMessage(String roomId, String username) {
-        return createSystemMessage(roomId, username + " joined the room");
-    }
-
-    public static ChatMessage createUserLeaveMessage(String roomId, String username) {
-        return createSystemMessage(roomId, username + " left the room");
+    
+    /**
+     * 创建通知消息
+     */
+    public static SystemMessage createNotification(String title, String content) {
+        SystemMessage message = new SystemMessage();
+        message.setTitle(title);
+        message.setContent(content);
+        message.setLevel("info");
+        message.setTimestamp(System.currentTimeMillis());
+        message.setType(MessageType.NOTIFICATION);
+        return message;
     }
 }
+
+
+
+

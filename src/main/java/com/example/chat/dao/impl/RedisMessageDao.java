@@ -2,121 +2,234 @@ package com.example.chat.dao.impl;
 
 import com.example.chat.dao.MessageDao;
 import com.example.chat.model.ChatMessage;
-import com.example.chat.util.JsonUtil;
-import com.example.chat.util.RedisUtil;
-import redis.clients.jedis.Jedis;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.stereotype.Repository;
+
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Set;
 
+@Slf4j
+@Repository
+@RequiredArgsConstructor
 public class RedisMessageDao implements MessageDao {
-    private static final String MESSAGE_KEY_PREFIX = "messages:room:";
-    private static final String MESSAGE_INDEX_PREFIX = "messages:index:";
-
+    
+    private final RedisTemplate<String, String> redisTemplate;
+    private final ObjectMapper objectMapper;
+    
+    private static final String MESSAGE_KEY = "message:";
+    private static final String ROOM_MESSAGES_KEY = "room:messages:";
+    private static final String USER_MESSAGES_KEY = "user:messages:";
+    private static final String PRIVATE_MESSAGES_KEY = "private:messages:";
+    
     @Override
-    public void save(ChatMessage ProtocolMessage) {
-        try (Jedis jedis = RedisUtil.getJedis()) {
-            String json = JsonUtil.toJson(ProtocolMessage);
-            String roomKey = MESSAGE_KEY_PREFIX + ProtocolMessage.getRoomId();
-            String messageKey = MESSAGE_INDEX_PREFIX + ProtocolMessage.getMessageId();
+    public ChatMessage save(ChatMessage message) {
+        try {
+            // 将消息对象转换为JSON字符串
+            String messageJson = objectMapper.writeValueAsString(message);
             
-            // 保存消息到时间线
-            jedis.zadd(roomKey, ProtocolMessage.getTimestamp(), ProtocolMessage.getMessageId());
-            // 保存消息内容
-            jedis.set(messageKey, json);
-            // 设置消息过期时间（可选，例如30天）
-            jedis.expire(messageKey, 30 * 24 * 60 * 60);
-        }
-    }
-
-    @Override
-    public List<ChatMessage> findByRoomId(String roomId, int limit, long beforeTime) {
-        try (Jedis jedis = RedisUtil.getJedis()) {
-            String roomKey = MESSAGE_KEY_PREFIX + roomId;
-            List<String> messageIds = jedis.zrevrangeByScore(roomKey, beforeTime, 0, 0, limit);
+            // 保存消息
+            String messageKey = MESSAGE_KEY + message.getId();
+            redisTemplate.opsForValue().set(messageKey, messageJson);
             
-            return messageIds.stream()
-                .map(messageId -> jedis.get(MESSAGE_INDEX_PREFIX + messageId))
-                .filter(json -> json != null)
-                .map(json -> JsonUtil.fromJson(json, ChatMessage.class))
-                .collect(Collectors.toList());
-        }
-    }
-
-    @Override
-    public void deleteByRoomId(String roomId) {
-        try (Jedis jedis = RedisUtil.getJedis()) {
-            String roomKey = MESSAGE_KEY_PREFIX + roomId;
-            // 获取所有消息ID
-            List<String> messageIds = jedis.zrange(roomKey, 0, -1);
-            
-            // 删除所有消息内容
-            for (String messageId : messageIds) {
-                jedis.del(MESSAGE_INDEX_PREFIX + messageId);
+            // 如果是房间消息，添加到房间消息集合
+            if (message.getRoomId() != null && !message.getRoomId().isEmpty()) {
+                String roomMessagesKey = ROOM_MESSAGES_KEY + message.getRoomId();
+                redisTemplate.opsForZSet().add(roomMessagesKey, message.getId(), message.getTimestamp());
             }
             
-            // 删除时间线
-            jedis.del(roomKey);
-        }
-    }
-
-    @Override
-    public long getMessageCount(String roomId) {
-        try (Jedis jedis = RedisUtil.getJedis()) {
-            String roomKey = MESSAGE_KEY_PREFIX + roomId;
-            return jedis.zcard(roomKey);
-        }
-    }
-
-    @Override
-    public List<ChatMessage> searchMessages(String roomId, String keyword, int limit) {
-        try (Jedis jedis = RedisUtil.getJedis()) {
-            String roomKey = MESSAGE_KEY_PREFIX + roomId;
-            List<String> messageIds = jedis.zrevrange(roomKey, 0, -1);
+            // 添加到发送者的消息集合
+            String senderMessagesKey = USER_MESSAGES_KEY + message.getSenderId();
+            redisTemplate.opsForZSet().add(senderMessagesKey, message.getId(), message.getTimestamp());
             
-            return messageIds.stream()
-                .map(messageId -> jedis.get(MESSAGE_INDEX_PREFIX + messageId))
-                .filter(json -> json != null)
-                .map(json -> JsonUtil.fromJson(json, ChatMessage.class))
-                .filter(ProtocolMessage -> ProtocolMessage.getContent().contains(keyword))
-                .limit(limit)
-                .collect(Collectors.toList());
-        }
-    }
-
-    @Override
-    public void deleteMessage(String messageId) {
-        try (Jedis jedis = RedisUtil.getJedis()) {
-            // 先获取消息内容以获取roomId
-            String messageKey = MESSAGE_INDEX_PREFIX + messageId;
-            String json = jedis.get(messageKey);
-            if (json != null) {
-                ChatMessage ProtocolMessage = JsonUtil.fromJson(json, ChatMessage.class);
-                String roomKey = MESSAGE_KEY_PREFIX + ProtocolMessage.getRoomId();
+            // 如果是私聊消息，添加到接收者的消息集合
+            if (message.getReceiverId() != null && !message.getReceiverId().isEmpty()) {
+                String receiverMessagesKey = USER_MESSAGES_KEY + message.getReceiverId();
+                redisTemplate.opsForZSet().add(receiverMessagesKey, message.getId(), message.getTimestamp());
                 
-                // 从时间线中删除
-                jedis.zrem(roomKey, messageId);
-                // 删除消息内容
-                jedis.del(messageKey);
+                // 添加到私聊消息集合
+                String privateMessagesKey = getPrivateMessagesKey(message.getSenderId(), message.getReceiverId());
+                redisTemplate.opsForZSet().add(privateMessagesKey, message.getId(), message.getTimestamp());
             }
+            
+            return message;
+        } catch (Exception e) {
+            log.error("Error saving message", e);
+            return null;
         }
     }
-
+    
     @Override
-    public void updateMessage(ChatMessage ProtocolMessage) {
-        try (Jedis jedis = RedisUtil.getJedis()) {
-            String messageKey = MESSAGE_INDEX_PREFIX + ProtocolMessage.getMessageId();
-            // 检查消息是否存在
-            if (!jedis.exists(messageKey)) {
-                throw new IllegalArgumentException("ProtocolMessage not found: " + ProtocolMessage.getMessageId());
+    public ChatMessage findById(String messageId) {
+        try {
+            String messageKey = MESSAGE_KEY + messageId;
+            String messageJson = redisTemplate.opsForValue().get(messageKey);
+            
+            if (messageJson != null) {
+                return objectMapper.readValue(messageJson, ChatMessage.class);
             }
             
-            // 更新消息内容
-            String json = JsonUtil.toJson(ProtocolMessage);
-            jedis.set(messageKey, json);
+            return null;
+        } catch (Exception e) {
+            log.error("Error getting message by ID", e);
+            return null;
+        }
+    }
+    
+    @Override
+    public boolean delete(String messageId) {
+        try {
+            // 获取消息
+            ChatMessage message = findById(messageId);
+            if (message == null) {
+                return false;
+            }
             
-            // 更新时间线中的时间戳（如果需要）
-            String roomKey = MESSAGE_KEY_PREFIX + ProtocolMessage.getRoomId();
-            jedis.zadd(roomKey, ProtocolMessage.getTimestamp(), ProtocolMessage.getMessageId());
+            // 删除消息
+            String messageKey = MESSAGE_KEY + messageId;
+            redisTemplate.delete(messageKey);
+            
+            // 从房间消息集合中删除
+            if (message.getRoomId() != null && !message.getRoomId().isEmpty()) {
+                String roomMessagesKey = ROOM_MESSAGES_KEY + message.getRoomId();
+                redisTemplate.opsForZSet().remove(roomMessagesKey, messageId);
+            }
+            
+            // 从发送者的消息集合中删除
+            String senderMessagesKey = USER_MESSAGES_KEY + message.getSenderId();
+            redisTemplate.opsForZSet().remove(senderMessagesKey, messageId);
+            
+            // 从接收者的消息集合中删除
+            if (message.getReceiverId() != null && !message.getReceiverId().isEmpty()) {
+                String receiverMessagesKey = USER_MESSAGES_KEY + message.getReceiverId();
+                redisTemplate.opsForZSet().remove(receiverMessagesKey, messageId);
+                
+                // 从私聊消息集合中删除
+                String privateMessagesKey = getPrivateMessagesKey(message.getSenderId(), message.getReceiverId());
+                redisTemplate.opsForZSet().remove(privateMessagesKey, messageId);
+            }
+            
+            return true;
+        } catch (Exception e) {
+            log.error("Error deleting message", e);
+            return false;
+        }
+    }
+    
+    @Override
+    public List<ChatMessage> findByRoomId(String roomId) {
+        return findByRoomId(roomId, 100, 0);
+    }
+    
+    // 辅助方法，用于分页获取房间消息
+    public List<ChatMessage> findByRoomId(String roomId, int limit, long before) {
+        try {
+            String roomMessagesKey = ROOM_MESSAGES_KEY + roomId;
+            
+            // 获取指定时间戳之前的消息ID
+            Set<String> messageIds;
+            if (before > 0) {
+                messageIds = redisTemplate.opsForZSet().reverseRangeByScore(
+                        roomMessagesKey, 0, before, 0, limit);
+            } else {
+                messageIds = redisTemplate.opsForZSet().reverseRange(roomMessagesKey, 0, limit - 1);
+            }
+            
+            if (messageIds == null || messageIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            
+            // 获取消息详情
+            List<ChatMessage> messages = new ArrayList<>();
+            for (String messageId : messageIds) {
+                ChatMessage message = findById(messageId);
+                if (message != null) {
+                    messages.add(message);
+                }
+            }
+            
+            return messages;
+        } catch (Exception e) {
+            log.error("Error getting messages by room ID", e);
+            return Collections.emptyList();
+        }
+    }
+    
+    @Override
+    public List<ChatMessage> findBetweenUsers(String userId1, String userId2, int limit, long before) {
+        try {
+            String privateMessagesKey = getPrivateMessagesKey(userId1, userId2);
+            
+            // 获取指定时间戳之前的消息ID
+            Set<String> messageIds;
+            if (before > 0) {
+                messageIds = redisTemplate.opsForZSet().reverseRangeByScore(
+                        privateMessagesKey, 0, before, 0, limit);
+            } else {
+                messageIds = redisTemplate.opsForZSet().reverseRange(privateMessagesKey, 0, limit - 1);
+            }
+            
+            if (messageIds == null || messageIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            
+            // 获取消息详情
+            List<ChatMessage> messages = new ArrayList<>();
+            for (String messageId : messageIds) {
+                ChatMessage message = findById(messageId);
+                if (message != null) {
+                    messages.add(message);
+                }
+            }
+            
+            return messages;
+        } catch (Exception e) {
+            log.error("Error getting messages between users", e);
+            return Collections.emptyList();
+        }
+    }
+    
+    // 辅助方法，不是接口的一部分
+    public List<ChatMessage> findByUserId(String userId) {
+        try {
+            String userMessagesKey = USER_MESSAGES_KEY + userId;
+            
+            // 获取用户的所有消息ID
+            Set<String> messageIds = redisTemplate.opsForZSet().reverseRange(userMessagesKey, 0, -1);
+            
+            if (messageIds == null || messageIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            
+            // 获取消息详情
+            List<ChatMessage> messages = new ArrayList<>();
+            for (String messageId : messageIds) {
+                ChatMessage message = findById(messageId);
+                if (message != null) {
+                    messages.add(message);
+                }
+            }
+            
+            return messages;
+        } catch (Exception e) {
+            log.error("Error getting messages by user ID", e);
+            return Collections.emptyList();
+        }
+    }
+    
+    /**
+     * 获取私聊消息的键
+     */
+    private String getPrivateMessagesKey(String userId1, String userId2) {
+        // 确保用户ID按字典序排序，保证两个用户之间的私聊消息使用相同的键
+        if (userId1.compareTo(userId2) < 0) {
+            return PRIVATE_MESSAGES_KEY + userId1 + ":" + userId2;
+        } else {
+            return PRIVATE_MESSAGES_KEY + userId2 + ":" + userId1;
         }
     }
 }

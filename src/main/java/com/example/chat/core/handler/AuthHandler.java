@@ -1,55 +1,47 @@
 package com.example.chat.core.handler;
 
-import com.example.chat.protocol.ProtocolMessage;
-import com.example.chat.protocol.MessageType;
+import com.example.chat.model.User;
+import com.example.chat.protocol.request.LoginRequest;
 import com.example.chat.protocol.response.ErrorResponse;
 import com.example.chat.protocol.response.LoginResponse;
+import com.example.chat.protocol.response.StatusCode;
 import com.example.chat.service.UserService;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.AttributeKey;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-//业务处理器示例（用户认证）
+
 @Slf4j
-@ChannelHandler.Sharable
-public class AuthHandler extends SimpleChannelInboundHandler<ProtocolMessage> {
+@RequiredArgsConstructor
+public class AuthHandler extends SimpleChannelInboundHandler<LoginRequest> {
+
     private final UserService userService;
-    
-    public AuthHandler(UserService userService) {
-        this.userService = userService;
-    }
-    
+
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, ProtocolMessage msg) {
-        if (msg.getType() != MessageType.LOGIN_REQUEST) {
-            if (isAuthenticated(ctx)) {
-                ctx.fireChannelRead(msg); // 非登录消息透传
-            } else {
-                ErrorResponse errorResponse = ErrorResponse.builder()
-                    .type(MessageType.ERROR)
-                    .content("Please login first")
-                    .build();
-                ctx.writeAndFlush(errorResponse);
-                ctx.close();
-            }
+    protected void channelRead0(ChannelHandlerContext ctx, LoginRequest msg) throws Exception {
+        if (isAuthenticated(ctx)) {
+            // 如果已经认证过，直接传递给下一个处理器
+            ctx.fireChannelRead(msg);
             return;
         }
+        
         //处理登录消息
         try {
-            boolean authenticated = userService.authenticate(msg.getSender(), msg.getContent());
-            if (authenticated) {
-                ctx.channel().attr(AttributeKey.valueOf("userId")).set(msg.getSender());
+            // 使用login方法进行认证
+            User user = userService.login(msg.getSender(), msg.getContent());
+            if (user != null) {
+                ctx.channel().attr(AttributeKey.valueOf("userId")).set(user.getId());
                 LoginResponse loginResponse = LoginResponse.builder()
                     .success(true)
-                    .ProtocolMessage("Login successful")
+                    .requestId(msg.getRequestId())
                     .build();
                 ctx.writeAndFlush(loginResponse);
             } else {
-                ErrorResponse errorResponse = ErrorResponse.builder()
-                    .type(MessageType.ERROR)
-                    .content("Invalid credentials")
-                    .build();
+                ErrorResponse errorResponse = ErrorResponse.create(
+                    StatusCode.UNAUTHORIZED, 
+                    "Invalid credentials"
+                );
                 ctx.writeAndFlush(errorResponse);
                 ctx.close();
             }
@@ -63,5 +55,14 @@ public class AuthHandler extends SimpleChannelInboundHandler<ProtocolMessage> {
         return ctx.channel().hasAttr(AttributeKey.valueOf("userId"));
     }
 }
+
+
+
+
+
+
+
+
+
 
 

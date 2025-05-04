@@ -1,7 +1,25 @@
 package com.example.chat.core.codec;
 
+/**
+ * 序列化类型枚举
+ */
 public enum SerializerType {
-    JSON,       // 0
-    PROTOBUF,   // 1
-    XML;        // 2
+    /**
+     * JSON序列化
+     */
+    JSON,
+    
+    /**
+     * Protobuf序列化
+     */
+    PROTOBUF,
+    
+    /**
+     * MsgPack序列化
+     */
+    MSGPACK
 }
+
+
+
+

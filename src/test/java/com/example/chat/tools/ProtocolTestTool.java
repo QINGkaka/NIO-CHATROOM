@@ -50,9 +50,10 @@ public class ProtocolTestTool {
     private static void testChatMessage(Channel channel) throws InterruptedException {
         System.out.println("Testing chat messages...");
         ChatRequest request = ChatRequest.builder()
-            .content("Test Message")
-            .sender("TestUser")
-            .roomId("TestRoom")
+            .type(MessageType.CHAT_REQUEST)
+            .sender("user1")
+            .content("Hello, world!")
+            .roomId("room1")
             .build();
         
         channel.writeAndFlush(request);
@@ -88,4 +89,5 @@ public class ProtocolTestTool {
         Thread.sleep(1000);
     }
 }
+
 

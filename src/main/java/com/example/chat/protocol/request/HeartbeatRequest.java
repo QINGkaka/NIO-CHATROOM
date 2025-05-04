@@ -1,18 +1,17 @@
 package com.example.chat.protocol.request;
 
-import com.example.chat.protocol.ProtocolMessage;
 import com.example.chat.protocol.MessageType;
+import com.example.chat.protocol.ProtocolMessage;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.SuperBuilder;
-import lombok.NoArgsConstructor;
 
 @Data
 @SuperBuilder
-@NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class HeartbeatRequest extends ProtocolMessage {
-    {
-        setType(MessageType.HEARTBEAT_REQUEST);
+    
+    public HeartbeatRequest() {
+        super(MessageType.HEARTBEAT_REQUEST);
     }
 }

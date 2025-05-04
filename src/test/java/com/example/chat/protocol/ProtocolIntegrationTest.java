@@ -73,14 +73,15 @@ public class ProtocolIntegrationTest {
     @Test
     public void testMessageTransmission() throws InterruptedException {
         // 创建测试消息
-        ChatRequest chatRequest = ChatRequest.builder()
-            .content("Test Message")
-            .sender("TestUser")
-            .roomId("TestRoom")
-            .build();
+        ChatRequest request = ChatRequest.builder()
+                .type(MessageType.CHAT_REQUEST)
+                .sender("user1")
+                .content("Hello, world!")
+                .roomId("room1")
+                .build();
 
         // 发送消息
-        clientChannel.writeAndFlush(chatRequest);
+        clientChannel.writeAndFlush(request);
 
         // 等待服务器接收消息
         assertTrue(messageLatch.await(5, TimeUnit.SECONDS), "Message was not received within 5 seconds");
@@ -99,3 +100,4 @@ public class ProtocolIntegrationTest {
         workerGroup.shutdownGracefully();
     }
 }
+

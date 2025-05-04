@@ -1,6 +1,6 @@
 package com.example.chat.core.codec;
 
-import com.example.chat.protocol.ProtocolMessage;
+import com.example.chat.model.ProtocolMessage;
 import com.example.chat.util.JsonUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageCodec;
@@ -18,7 +18,8 @@ public class WebSocketMessageCodec extends MessageToMessageCodec<TextWebSocketFr
     @Override
     protected void decode(ChannelHandlerContext ctx, TextWebSocketFrame frame, List<Object> out) {
         String json = frame.text();
-        ProtocolMessage ProtocolMessage = JsonUtil.fromJson(json, ProtocolMessage.class);
-        out.add(ProtocolMessage);
+        ProtocolMessage protocolMessage = JsonUtil.fromJson(json, ProtocolMessage.class);
+        out.add(protocolMessage);
     }
 }
+

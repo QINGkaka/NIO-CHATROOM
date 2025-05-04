@@ -1,246 +1,269 @@
 package com.example.chat.core.handler;
 
 import com.example.chat.model.ChatMessage;
-import com.example.chat.model.ChatRoom;
 import com.example.chat.model.User;
-import com.example.chat.protocol.ProtocolMessage;
-import com.example.chat.protocol.StatusCode;
-import com.example.chat.protocol.request.ChatRequest;
-import com.example.chat.protocol.request.LoginRequest;
-import com.example.chat.protocol.request.RoomRequest;
-import com.example.chat.protocol.response.ChatResponse;
-import com.example.chat.protocol.response.LoginResponse;
-import com.example.chat.protocol.response.RoomResponse;
-import com.example.chat.protocol.response.ErrorResponse;
-import com.example.chat.protocol.MessageValidator;
 import com.example.chat.service.MessageService;
 import com.example.chat.service.RoomService;
 import com.example.chat.service.UserService;
-import com.example.chat.util.ChannelUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import java.util.UUID;
 
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
-public class WebSocketServerHandler extends SimpleChannelInboundHandler<ProtocolMessage> {
+@RequiredArgsConstructor
+public class WebSocketServerHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
+
     private final UserService userService;
     private final RoomService roomService;
     private final MessageService messageService;
-
-    public WebSocketServerHandler(UserService userService, RoomService roomService, MessageService messageService) {
-        this.userService = userService;
-        this.roomService = roomService;
-        this.messageService = messageService;
-    }
-
+    private final ObjectMapper objectMapper;
+    private final Map<String, ChannelHandlerContext> userChannels;
+    
+    private String userId;
+    
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, ProtocolMessage msg) {
-        try {
-            // 添加消息验证
-            MessageValidator.validate(msg);
-            
-            // 根据消息类型处理
-            switch (msg.getType()) {
-                case LOGIN_REQUEST:
-                    handleLoginRequest(ctx, (LoginRequest) msg);
-                    break;
-                case CHAT_REQUEST:
-                    handleChatRequest(ctx, (ChatRequest) msg);
-                    break;
-                case ROOM_CREATE:
-                case ROOM_JOIN:
-                case ROOM_LEAVE:
-                case ROOM_LIST:
-                    handleRoomRequest(ctx, (RoomRequest) msg);
-                    break;
-                default:
-                    log.warn("Unsupported message type: {}", msg.getType());
-                    ErrorResponse errorResponse = new ErrorResponse(
-                        StatusCode.BAD_REQUEST,
-                        "Unsupported message type"
-                    );
-                    ctx.writeAndFlush(errorResponse);
-            }
-        } catch (IllegalArgumentException e) {
-            // 处理验证失败的情况
-            log.error("Message validation failed: {}", e.getMessage());
-            ErrorResponse errorResponse = new ErrorResponse(
-                StatusCode.BAD_REQUEST,
-                e.getMessage()
-            );
-            ctx.writeAndFlush(errorResponse);
-        } catch (Exception e) {
-            // 处理其他异常
-            log.error("Error processing message", e);
-            ErrorResponse errorResponse = new ErrorResponse(
-                StatusCode.INTERNAL_ERROR,
-                "Internal server error"
-            );
-            ctx.writeAndFlush(errorResponse);
-        }
-    }
-
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof WebSocketServerProtocolHandler.HandshakeComplete) {
-            log.info("WebSocket client connected: {}", ctx.channel().remoteAddress());
+    protected void channelRead0(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
+        if (frame instanceof TextWebSocketFrame) {
+            String text = ((TextWebSocketFrame) frame).text();
+            handleTextMessage(ctx, text);
         } else {
-            super.userEventTriggered(ctx, evt);
+            log.warn("Unsupported frame type: {}", frame.getClass().getName());
         }
     }
-
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx) {
-        String userId = ChannelUtil.getUserId(ctx.channel());
-        if (userId != null) {
-            userService.setUserOnlineStatus(userId, false);
-            ChannelUtil.unbindUser(ctx.channel());
-            log.info("User disconnected: {}", userId);
-        }
-    }
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        log.error("WebSocket handler error", cause);
-        ctx.close();
-    }
-
-    private void handleLoginRequest(ChannelHandlerContext ctx, LoginRequest request) {
-        LoginResponse response = new LoginResponse();
-        response.setRequestId(request.getRequestId());
-
+    
+    @SuppressWarnings("unchecked")
+    private void handleTextMessage(ChannelHandlerContext ctx, String text) {
         try {
-            User user = userService.login(request.getUsername(), request.getPassword());
-            if (user != null) {
-                ChannelUtil.bindUser(ctx.channel(), user.getUserId());
-                userService.setUserOnlineStatus(user.getUserId(), true);
-                response.setSuccess(true);
-                response.setUser(user);
-            } else {
-                response.setSuccess(false);
-                response.setError("Invalid username or password");
-            }
-        } catch (Exception e) {
-            log.error("Login error", e);
-            response.setSuccess(false);
-            response.setError("Internal server error");
-        }
-
-        ctx.writeAndFlush(response);
-    }
-
-    private void handleChatRequest(ChannelHandlerContext ctx, ChatRequest request) {
-        ChatResponse response = new ChatResponse();
-        response.setRequestId(request.getRequestId());
-
-        String userId = ChannelUtil.getUserId(ctx.channel());
-        if (userId == null) {
-            response.setSuccess(false);
-            response.setError("Not logged in");
-            ctx.writeAndFlush(response);
-            return;
-        }
-
-        try {
-            if (!roomService.isRoomMember(request.getRoomId(), userId)) {
-                response.setSuccess(false);
-                response.setError("Not a member of the room");
-                ctx.writeAndFlush(response);
-                return;
-            }
-
-            User user = userService.getUserById(userId);
-            ChatMessage message = ChatMessage.builder()
-                .messageId(UUID.randomUUID().toString())
-                .roomId(request.getRoomId())
-                .userId(userId)
-                .username(user.getUsername())
-                .content(request.getContent())
-                .timestamp(System.currentTimeMillis())
-                .type(ChatMessage.MessageType.TEXT)
-                .build();
-
-            messageService.sendMessage(message);
-            messageService.broadcastMessage(message);
-
-            response.setSuccess(true);
-            response.setMessage(message);  // 从 setProtocolMessage 改为 setMessage
-        } catch (Exception e) {
-            log.error("Chat error", e);
-            ErrorResponse errorResponse = new ErrorResponse(
-                StatusCode.INTERNAL_ERROR,
-                "Failed to process chat message"
-            );
-            ctx.writeAndFlush(errorResponse);
-            return;
-        }
-
-        ctx.writeAndFlush(response);
-    }
-
-    private void handleRoomRequest(ChannelHandlerContext ctx, RoomRequest request) {
-        RoomResponse response = new RoomResponse();
-        response.setRequestId(request.getRequestId());
-
-        String userId = ChannelUtil.getUserId(ctx.channel());
-        if (userId == null) {
-            response.setSuccess(false);
-            response.setError("Not logged in");
-            ctx.writeAndFlush(response);
-            return;
-        }
-
-        try {
-            switch (request.getAction().toUpperCase()) {
-                case "CREATE":
-                    ChatRoom room = roomService.createRoom(request.getRoomName(), userId);
-                    response.setSuccess(true);
-                    response.setRoom(room);
+            Map<String, Object> message = objectMapper.readValue(text, Map.class);
+            String type = (String) message.get("type");
+            
+            switch (type) {
+                case "auth":
+                    handleAuth(ctx, message);
                     break;
-
-                case "JOIN":
-                    roomService.joinRoom(request.getRoomId(), userId);
-                    response.setSuccess(true);
-                    response.setRoom(roomService.getRoom(request.getRoomId()));
+                case "message":
+                    handleChatMessage(ctx, message);
                     break;
-
-                case "LEAVE":
-                    roomService.leaveRoom(request.getRoomId(), userId);
-                    response.setSuccess(true);
+                case "join":
+                    handleJoinRoom(ctx, message);
                     break;
-
+                case "leave":
+                    handleLeaveRoom(ctx, message);
+                    break;
+                case "getUsers":
+                    handleGetUsers(ctx);
+                    break;
+                case "getRoomUsers":
+                    handleGetRoomUsers(ctx, message);
+                    break;
                 default:
-                    response.setSuccess(false);
-                    response.setError("Unknown action: " + request.getAction());
+                    log.warn("Unknown message type: {}", type);
             }
         } catch (Exception e) {
-            log.error("Room operation error", e);
-            ErrorResponse errorResponse = new ErrorResponse(
-                StatusCode.ROOM_NOT_EXIST,
-                "Room operation failed"
-            );
-            ctx.writeAndFlush(errorResponse);
+            log.error("Error processing message", e);
+            sendError(ctx, "Invalid message format");
+        }
+    }
+    
+    private void handleAuth(ChannelHandlerContext ctx, Map<String, Object> message) {
+        String token = (String) message.get("token");
+        
+        // 验证token
+        String userId = userService.validateToken(token);
+        if (userId != null) {
+            this.userId = userId;
+            userChannels.put(userId, ctx);
+            
+            // 更新用户在线状态
+            User user = userService.getUserById(userId);
+            if (user != null) {
+                user.setOnline(true);
+                userService.updateUser(user);
+            }
+            
+            // 发送认证成功响应
+            Map<String, Object> response = new HashMap<>();
+            response.put("type", "auth");
+            response.put("success", true);
+            response.put("userId", userId);
+            
+            sendMessage(ctx, response);
+            log.info("User authenticated: {}", userId);
+        } else {
+            sendError(ctx, "Authentication failed");
+            ctx.close();
+        }
+    }
+    
+    private void handleChatMessage(ChannelHandlerContext ctx, Map<String, Object> message) {
+        if (userId == null) {
+            sendError(ctx, "Not authenticated");
             return;
         }
-
-        ctx.writeAndFlush(response);
+        
+        String text = (String) message.get("text");
+        String image = (String) message.get("image");
+        String roomId = (String) message.get("roomId");
+        String receiverId = (String) message.get("receiverId");
+        
+        // 创建消息对象
+        ChatMessage chatMessage = ChatMessage.builder()
+                .senderId(userId)
+                .content(text != null ? text : image)
+                .roomId(roomId)
+                .receiverId(receiverId)
+                .timestamp(System.currentTimeMillis())
+                .type(image != null ? ChatMessage.MessageType.IMAGE : ChatMessage.MessageType.TEXT)
+                .build();
+        
+        // 保存并发送消息
+        messageService.sendMessage(chatMessage);
+        
+        // 发送确认
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "messageAck");
+        response.put("messageId", chatMessage.getId());
+        response.put("success", true);
+        
+        sendMessage(ctx, response);
+    }
+    
+    private void handleJoinRoom(ChannelHandlerContext ctx, Map<String, Object> message) {
+        if (userId == null) {
+            sendError(ctx, "Not authenticated");
+            return;
+        }
+        
+        String roomId = (String) message.get("roomId");
+        
+        // 加入房间
+        roomService.addUserToRoom(roomId, userId);
+        
+        // 发送系统消息
+        ChatMessage systemMessage = ChatMessage.builder()
+                .senderId("system")
+                .content(userService.getUserById(userId).getUsername() + " joined the room")
+                .roomId(roomId)
+                .timestamp(System.currentTimeMillis())
+                .type(ChatMessage.MessageType.SYSTEM)
+                .build();
+        
+        messageService.sendMessage(systemMessage);
+        
+        // 发送确认
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "joinAck");
+        response.put("roomId", roomId);
+        response.put("success", true);
+        
+        sendMessage(ctx, response);
+    }
+    
+    private void handleLeaveRoom(ChannelHandlerContext ctx, Map<String, Object> message) {
+        if (userId == null) {
+            sendError(ctx, "Not authenticated");
+            return;
+        }
+        
+        String roomId = (String) message.get("roomId");
+        
+        // 离开房间
+        roomService.removeUserFromRoom(roomId, userId);
+        
+        // 发送系统消息
+        ChatMessage systemMessage = ChatMessage.builder()
+                .senderId("system")
+                .content(userService.getUserById(userId).getUsername() + " left the room")
+                .roomId(roomId)
+                .timestamp(System.currentTimeMillis())
+                .type(ChatMessage.MessageType.SYSTEM)
+                .build();
+        
+        messageService.sendMessage(systemMessage);
+        
+        // 发送确认
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "leaveAck");
+        response.put("roomId", roomId);
+        response.put("success", true);
+        
+        sendMessage(ctx, response);
+    }
+    
+    private void handleGetUsers(ChannelHandlerContext ctx) {
+        if (userId == null) {
+            sendError(ctx, "Not authenticated");
+            return;
+        }
+        
+        List<User> users = userService.getAllUsers();
+        List<Map<String, Object>> userList = users.stream()
+                .map(this::convertUserToMap)
+                .collect(Collectors.toList());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "users");
+        response.put("users", userList);
+        
+        sendMessage(ctx, response);
+    }
+    
+    private void handleGetRoomUsers(ChannelHandlerContext ctx, Map<String, Object> message) {
+        if (userId == null) {
+            sendError(ctx, "Not authenticated");
+            return;
+        }
+        
+        String roomId = (String) message.get("roomId");
+        List<String> userIds = roomService.getRoomMembers(roomId);
+        
+        List<Map<String, Object>> userList = userIds.stream()
+                .map(userService::getUserById)
+                .filter(Objects::nonNull)
+                .map(this::convertUserToMap)
+                .collect(Collectors.toList());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "roomUsers");
+        response.put("roomId", roomId);
+        response.put("users", userList);
+        
+        sendMessage(ctx, response);
+    }
+    
+    private Map<String, Object> convertUserToMap(User user) {
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("id", user.getId());
+        userMap.put("username", user.getUsername());
+        userMap.put("online", user.isOnline());
+        userMap.put("fullName", user.getFullName());
+        userMap.put("profilePicture", user.getProfilePicture());
+        return userMap;
+    }
+    
+    private void sendMessage(ChannelHandlerContext ctx, Map<String, Object> response) {
+        try {
+            String jsonResponse = objectMapper.writeValueAsString(response);
+            ctx.writeAndFlush(new TextWebSocketFrame(jsonResponse));
+        } catch (Exception e) {
+            log.error("Error sending message", e);
+        }
+    }
+    
+    private void sendError(ChannelHandlerContext ctx, String errorMessage) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("type", "error");
+        errorResponse.put("message", errorMessage);
+        sendMessage(ctx, errorResponse);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

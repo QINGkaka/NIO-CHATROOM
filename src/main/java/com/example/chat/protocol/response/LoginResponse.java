@@ -1,25 +1,29 @@
 package com.example.chat.protocol.response;
 
 import com.example.chat.model.User;
-import com.example.chat.protocol.ProtocolMessage;
+import com.example.chat.protocol.AbstractProtocolMessage;
 import com.example.chat.protocol.MessageType;
+import lombok.Builder;
 import lombok.Data;
-import lombok.experimental.SuperBuilder;
 import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
 
 @Data
-@SuperBuilder
-@NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-public class LoginResponse extends ProtocolMessage {
+public class LoginResponse extends AbstractProtocolMessage {
     private boolean success;
-    private String token;
     private User user;
-    private String ProtocolMessage;
     private String error;
     
-    {
-        setType(MessageType.LOGIN_RESPONSE);
+    public LoginResponse() {
+        super(MessageType.LOGIN_RESPONSE);
+    }
+    
+    @Builder
+    public LoginResponse(boolean success, User user, String error, String requestId) {
+        super(MessageType.LOGIN_RESPONSE);
+        this.success = success;
+        this.user = user;
+        this.error = error;
+        this.setRequestId(requestId);
     }
 }

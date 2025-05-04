@@ -1,11 +1,13 @@
 package com.example.chat.protocol;
 
 import lombok.Getter;
-import lombok.AllArgsConstructor;
 
+/**
+ * 状态码枚举
+ */
 @Getter
-@AllArgsConstructor
 public enum StatusCode {
+    
     // 成功
     OK(200, "Success"),
     
@@ -20,16 +22,33 @@ public enum StatusCode {
     SERVICE_UNAVAILABLE(503, "Service Unavailable"),
     
     // 业务错误
-    INVALID_MESSAGE(1000, "Invalid Message Format"),
-    ROOM_NOT_EXIST(1001, "Chat Room Not Exist"),
-    ROOM_FULL(1002, "Chat Room Is Full"),
-    USER_NOT_IN_ROOM(1003, "User Not In Room"),
+    USER_NOT_EXIST(1001, "User does not exist"),
+    USER_ALREADY_EXIST(1002, "User already exists"),
+    ROOM_NOT_EXIST(1003, "Room does not exist"),
+    ROOM_ALREADY_EXIST(1004, "Room already exists"),
+    MESSAGE_NOT_EXIST(1005, "Message does not exist"),
+    ALREADY_LOGGED_IN(1006, "User already logged in"),
+    INVALID_CREDENTIALS(1007, "Invalid credentials");
     
-    // 系统错误
-    SYSTEM_BUSY(2000, "System Busy"),
-    RATE_LIMIT(2001, "Rate Limit Exceeded");
-
     private final int code;
     private final String message;
+    
+    StatusCode(int code, String message) {
+        this.code = code;
+        this.message = message;
+    }
+    
+    /**
+     * 根据状态码获取枚举
+     */
+    public static StatusCode fromCode(int code) {
+        for (StatusCode statusCode : values()) {
+            if (statusCode.getCode() == code) {
+                return statusCode;
+            }
+        }
+        return INTERNAL_ERROR;
+    }
 }
+
 

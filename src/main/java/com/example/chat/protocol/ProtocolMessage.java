@@ -1,24 +1,32 @@
 package com.example.chat.protocol;
 
-import lombok.Data;
-import lombok.experimental.SuperBuilder;
-import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public abstract class ProtocolMessage {
-    // 当前实现
+public class ProtocolMessage {
     private MessageType type;
+    private int statusCode;
     private String requestId;
+    private long timestamp;
     private String sender;
     private String content;
+    private String roomId;
     
-    // 建议添加
-    private int version = 1;        // 协议版本
-    private int statusCode;         // 状态码
-    private String statusMessage;   // 状态消息
-    private long timestamp;         // 时间戳
+    // 构造函数
+    public ProtocolMessage(MessageType type) {
+        this.type = type;
+        this.timestamp = System.currentTimeMillis();
+        this.requestId = java.util.UUID.randomUUID().toString();
+    }
 }
+
+
+
+
+

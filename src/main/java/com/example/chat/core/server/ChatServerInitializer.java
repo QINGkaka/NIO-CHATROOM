@@ -1,11 +1,12 @@
 package com.example.chat.core.server;
 
-import com.example.chat.core.codec.WebSocketMessageCodec;
 import com.example.chat.core.handler.HeartbeatHandler;
+import com.example.chat.core.handler.WebSocketMessageCodec;
 import com.example.chat.core.handler.WebSocketServerHandler;
-import com.example.chat.service.UserService;
-import com.example.chat.service.RoomService;
 import com.example.chat.service.MessageService;
+import com.example.chat.service.RoomService;
+import com.example.chat.service.UserService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -14,20 +15,23 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
+import lombok.RequiredArgsConstructor;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+@RequiredArgsConstructor
 public class ChatServerInitializer extends ChannelInitializer<SocketChannel> {
     private static final String WEBSOCKET_PATH = "/ws";
+    
     private final UserService userService;
     private final RoomService roomService;
     private final MessageService messageService;
-
-    public ChatServerInitializer(UserService userService, RoomService roomService, MessageService messageService) {
-        this.userService = userService;
-        this.roomService = roomService;
-        this.messageService = messageService;
-    }
+    private final ObjectMapper objectMapper;
+    
+    // 存储用户ID和Channel的映射
+    private final Map<String, io.netty.channel.ChannelHandlerContext> userChannels = new ConcurrentHashMap<>();
 
     @Override
     protected void initChannel(SocketChannel ch) {
@@ -47,7 +51,10 @@ public class ChatServerInitializer extends ChannelInitializer<SocketChannel> {
         pipeline.addLast(new HeartbeatHandler());
 
         // 业务逻辑处理器
-        pipeline.addLast(new WebSocketServerHandler(userService, roomService, messageService));
+        pipeline.addLast(new WebSocketServerHandler(userService, roomService, messageService, objectMapper, userChannels));
     }
 }
+
+
+
 

@@ -4,15 +4,33 @@ import com.example.chat.model.ChatMessage;
 import java.util.List;
 
 public interface MessageService {
-    void sendMessage(ChatMessage ProtocolMessage);
-    List<ChatMessage> getRoomMessages(String roomId, int limit, long beforeTime);
-    void deleteRoomMessages(String roomId);
-    void broadcastMessage(ChatMessage ProtocolMessage);
     
-    // 新添加的方法
-    long getMessageCount(String roomId);
-    List<ChatMessage> searchMessages(String roomId, String keyword, int limit);
-    void deleteMessage(String messageId);
-    void updateMessage(ChatMessage ProtocolMessage);
+    /**
+     * 保存消息
+     */
+    void saveMessage(ChatMessage message);
+    
+    /**
+     * 获取用户的消息历史
+     */
+    List<ChatMessage> getUserMessages(String userId, String otherUserId, int limit);
+    
+    /**
+     * 获取房间的消息历史
+     */
+    List<ChatMessage> getRoomMessages(String roomId, int limit);
+    
+    /**
+     * 获取两个用户之间的消息
+     */
+    List<ChatMessage> getMessagesBetweenUsers(String userId1, String userId2);
+    
+    /**
+     * 发送消息
+     */
+    void sendMessage(ChatMessage message);
 }
+
+
+
 

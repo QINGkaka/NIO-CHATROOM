@@ -1,11 +1,11 @@
 package com.example.chat.protocol.request;
 
-import com.example.chat.protocol.ProtocolMessage;
 import com.example.chat.protocol.MessageType;
+import com.example.chat.protocol.ProtocolMessage;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.experimental.SuperBuilder;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
@@ -13,11 +13,11 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode(callSuper = true)
 public class RoomRequest extends ProtocolMessage {
     private String roomId;
-    private String roomName;  // Added for room creation
-    private String action;    // Added to specify the action (CREATE, JOIN, LEAVE)
-    private MessageType type;
+    private String roomName;
+    private String userId;
     
-    {
-        setType(MessageType.ROOM_CREATE); // Default type, can be changed via builder
+    public RoomRequest(MessageType type, String roomId) {
+        super(type);
+        this.roomId = roomId;
     }
 }

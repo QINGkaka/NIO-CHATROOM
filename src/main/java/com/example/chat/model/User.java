@@ -10,19 +10,23 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class User {
-    private String userId;
+    private String id;
     private String username;
     private String password;
-    private String nickname;
-    private UserStatus status;
+    private String profilePicture;
+    private String email;
     private boolean online;
-
-    public void setOnline(boolean online) {
-        this.online = online;
-        this.status = online ? UserStatus.ONLINE : UserStatus.OFFLINE;
+    
+    // 添加这些方法以兼容现有代码
+    public String getFullName() {
+        return username; // 简化实现，实际应用中可能需要firstName + lastName
     }
-
-    public boolean isOnline() {
-        return this.online;
+    
+    public String getEmail() {
+        return email;
+    }
+    
+    public void setEmail(String email) {
+        this.email = email;
     }
 }

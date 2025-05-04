@@ -1,13 +1,19 @@
 package com.example.chat.dao;
 
-import com.example.chat.model.ChatRoom;
+import com.example.chat.model.Room;
 import java.util.List;
+import java.util.Set;
 
 public interface RoomDao {
-    ChatRoom findById(String roomId);
-    void save(ChatRoom room);
-    void update(ChatRoom room);
+    Room save(Room room);
+    Room findById(String roomId);
+    List<Room> findAll();
     void delete(String roomId);
-    List<ChatRoom> findAll();
-    List<ChatRoom> findByMember(String userId);
+    void deleteRoom(String roomId);
+    void updateRoom(Room room);
+    void addUserToRoom(String roomId, String userId);
+    void removeUserFromRoom(String roomId, String userId);
+    Set<String> getRoomMembers(String roomId);
+    List<String> getUserRooms(String userId);
+    List<Room> findByUserId(String userId);
 }

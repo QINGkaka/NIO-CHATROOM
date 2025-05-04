@@ -1,16 +1,22 @@
 package com.example.chat.protocol;
 
+/**
+ * 消息验证器
+ */
 public class MessageValidator {
+    
+    /**
+     * 验证消息
+     */
     public static void validate(ProtocolMessage message) {
         if (message == null) {
             throw new IllegalArgumentException("Message cannot be null");
         }
+        
         if (message.getType() == null) {
             throw new IllegalArgumentException("Message type cannot be null");
         }
-        if (message.getRequestId() == null || message.getRequestId().isEmpty()) {
-            throw new IllegalArgumentException("Request ID cannot be null or empty");
-        }
+        
         if (message.getTimestamp() <= 0) {
             throw new IllegalArgumentException("Invalid timestamp");
         }
@@ -27,6 +33,7 @@ public class MessageValidator {
             case ROOM_JOIN:
             case ROOM_LEAVE:
             case ROOM_LIST:
+            case ROOM_REQUEST:
                 validateRoomRequest(message);
                 break;
             default:
@@ -59,6 +66,9 @@ public class MessageValidator {
         }
     }
 }
+
+
+
 
 
 

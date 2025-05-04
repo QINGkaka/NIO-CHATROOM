@@ -9,8 +9,6 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.DecoderException;
 import org.junit.jupiter.api.Test;
 
-import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 public class MessageCodecTest {
@@ -25,9 +23,9 @@ public class MessageCodecTest {
 
         // 2. 创建测试消息
         ChatRequest original = ChatRequest.builder()
-            .requestId(UUID.randomUUID().toString())
-            .sender("testUser")
-            .content("Hello, World!")
+            .type(MessageType.CHAT_REQUEST)
+            .sender("user1")
+            .content("Hello, world!")
             .roomId("room1")
             .build();
 
@@ -45,13 +43,15 @@ public class MessageCodecTest {
         
         // 7. 验证解码后的消息
         assertNotNull(decoded);
-        assertTrue(decoded instanceof ChatRequest);
-        ChatRequest decodedRequest = (ChatRequest) decoded;
-        
-        assertEquals(original.getRequestId(), decodedRequest.getRequestId());
-        assertEquals(original.getSender(), decodedRequest.getSender());
-        assertEquals(original.getContent(), decodedRequest.getContent());
-        assertEquals(original.getRoomId(), decodedRequest.getRoomId());
+        assertTrue(decoded.getType() == MessageType.CHAT_REQUEST);
+        if (decoded.getType() == MessageType.CHAT_REQUEST) {
+            ChatRequest decodedRequest = (ChatRequest) decoded;
+            
+            assertEquals(original.getRequestId(), decodedRequest.getRequestId());
+            assertEquals(original.getSender(), decodedRequest.getSender());
+            assertEquals(original.getContent(), decodedRequest.getContent());
+            assertEquals(original.getRoomId(), decodedRequest.getRoomId());
+        }
     }
 
     @Test
@@ -79,3 +79,6 @@ public class MessageCodecTest {
         }
     }
 }
+
+
+

@@ -1,95 +1,107 @@
 package com.example.chat.service.impl;
 
-import com.example.chat.dao.UserDao;
 import com.example.chat.model.User;
 import com.example.chat.service.UserService;
-import com.example.chat.util.PasswordUtil;
+import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
+@Service
 public class UserServiceImpl implements UserService {
-    private final UserDao userDao;
-
-    public UserServiceImpl(UserDao userDao) {
-        this.userDao = userDao;
+    
+    // 模拟用户数据库
+    private final Map<String, User> users = new ConcurrentHashMap<>();
+    
+    // 用户名到用户ID的映射
+    private final Map<String, String> usernameToId = new ConcurrentHashMap<>();
+    
+    // 模拟token到用户ID的映射
+    private final Map<String, String> tokenToUserId = new ConcurrentHashMap<>();
+    
+    @Override
+    public User getUserById(String userId) {
+        return users.get(userId);
     }
-
+    
+    @Override
+    public User getUserByUsername(String username) {
+        String userId = usernameToId.get(username);
+        if (userId != null) {
+            return users.get(userId);
+        }
+        return null;
+    }
+    
+    @Override
+    public List<User> getOnlineUsers() {
+        return users.values().stream()
+                .filter(User::isOnline)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
+    public List<User> getAllUsers() {
+        return new ArrayList<>(users.values());
+    }
+    
+    @Override
+    public void updateUser(User user) {
+        if (user != null && user.getId() != null) {
+            users.put(user.getId(), user);
+        }
+    }
+    
+    @Override
+    public User createUser(User user) {
+        if (user == null) {
+            return null;
+        }
+        
+        // 检查用户名是否已存在
+        if (getUserByUsername(user.getUsername()) != null) {
+            return null; // 用户名已存在
+        }
+        
+        // 生成用户ID
+        String userId = UUID.randomUUID().toString();
+        user.setId(userId);
+        
+        // 保存用户
+        users.put(userId, user);
+        usernameToId.put(user.getUsername(), userId);
+        
+        return user;
+    }
+    
+    @Override
+    public String validateToken(String token) {
+        // 简单的token验证，实际应用中应该使用JWT等
+        return tokenToUserId.get(token);
+    }
+    
     @Override
     public User login(String username, String password) {
-        User user = userDao.findByUsername(username);
-        if (user != null && PasswordUtil.verify(password, user.getPassword())) {
+        User user = getUserByUsername(username);
+        if (user != null && password.equals(user.getPassword())) {
+            // 生成token
+            String token = UUID.randomUUID().toString();
+            tokenToUserId.put(token, user.getId());
+            
+            // 更新用户状态
             user.setOnline(true);
-            userDao.update(user);
+            updateUser(user);
+            
             return user;
         }
         return null;
     }
-
-    @Override
-    public User register(String username, String password, String nickname) {
-        if (userDao.findByUsername(username) != null) {
-            throw new IllegalArgumentException("Username already exists");
-        }
-
-        User user = User.builder()
-            .userId(UUID.randomUUID().toString())
-            .username(username)
-            .password(PasswordUtil.hash(password))
-            .nickname(nickname)
-            .online(false)
-            .build();
-
-        userDao.save(user);
-        return user;
-    }
-
-    @Override
-    public User getUserById(String userId) {
-        return userDao.findById(userId);
-    }
-
-    @Override
-    public User getUserByUsername(String username) {
-        return userDao.findByUsername(username);
-    }
-
-    @Override
-    public void updateUser(User user) {
-        userDao.update(user);
-    }
-
-    @Override
-    public void deleteUser(String userId) {
-        userDao.delete(userId);
-    }
-
-    @Override
-    public List<User> getAllUsers() {
-        return userDao.findAll();
-    }
-
-    @Override
-    public boolean isOnline(String userId) {
-        User user = getUserById(userId);
-        return user != null && user.isOnline();
-    }
-
-    @Override
-    public void setUserOnlineStatus(String userId, boolean online) {
-        User user = getUserById(userId);
-        if (user != null) {
-            user.setOnline(online);
-            userDao.update(user);
-        }
-    }
-
-    @Override
-    public boolean authenticate(String userId, String password) {
-          User user = userDao.findById(userId);
-       if (user == null) {
-          return false;
-      }
-        return PasswordUtil.verify(password, user.getPassword());
-    }
 }
+
+
+
+
